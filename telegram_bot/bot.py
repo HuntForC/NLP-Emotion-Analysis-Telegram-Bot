@@ -15,6 +15,10 @@ from telegram.ext import (
     CallbackContext,
 )
 
+from model_training.data_preprocessing import preprocess_text, initialize_nltk
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import stopwords
+
 # Configure logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -77,6 +81,9 @@ def init_bot() -> Optional[str]:
 # Load model artifacts
 model, label_encoder = load_model_artifacts()
 TOKEN = init_bot()
+initialize_nltk()
+lemmatizer = WordNetLemmatizer()
+stop_words = set(stopwords.words("english"))
 
 
 async def start_command(update: Update, context: CallbackContext) -> None:
@@ -108,10 +115,12 @@ async def about_command(update: Update, context: CallbackContext) -> None:
 async def analyze_text(update: Update, context: CallbackContext) -> None:
     """Analyze the emotional content of user messages"""
     try:
-        text = update.message.text  # type: ignore
+        text = update.message.text.strip()  # type: ignore
+
+        proccesed_text = preprocess_text(text, lemmatizer, stop_words)
 
         # Predict emotion
-        predicted_label = model.predict([text])[0]
+        predicted_label = model.predict([proccesed_text])[0]
         emotion = label_encoder.inverse_transform([predicted_label])[0]
 
         # Map emotions to emojis
@@ -168,7 +177,3 @@ def main() -> None:
     except Exception as e:
         logger.error(f"Error starting bot: {e}")
         raise
-
-
-if __name__ == "__main__":
-    main()
