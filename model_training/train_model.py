@@ -12,7 +12,7 @@ def train_model():
     
     # Create model pipeline with best parameters
     pipeline = Pipeline([
-        ('tfidf', TfidfVectorizer(max_features=5000, ngram_range=(1, 1))),
+        ('tfidf', TfidfVectorizer(max_features=5000, ngram_range=(1, 2))),
         ('clf', LogisticRegression(C=10.0, max_iter=1000, solver='lbfgs'))
     ])
     
@@ -20,11 +20,11 @@ def train_model():
     pipeline.fit(train_df['text'], train_df['emotion_encoded'])
     
     # Evaluate on validation set
-    # test_df = load_data('data/val.txt')
-    # test_df, _ = preprocess_data(test_df)
-    # y_pred = pipeline.predict(test_df['text'])
-    # accuracy = accuracy_score(test_df['emotion_encoded'], y_pred)
-    # print(f"\nValidation set accuracy: {accuracy:.4f}")
+    test_df = load_data('data/val.txt')
+    test_df, _ = preprocess_data(test_df)
+    y_pred = pipeline.predict(test_df['text'])
+    accuracy = accuracy_score(test_df['emotion_encoded'], y_pred)
+    print(f"\nValidation set accuracy: {accuracy:.4f}")
 
     # Save artifacts
     joblib.dump(pipeline, 'model_training/model.pkl')
