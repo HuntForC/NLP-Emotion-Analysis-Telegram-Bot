@@ -169,3 +169,35 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# VS Code settings
+.vscode/
+
+# Virtual environment
+.python-version
+.env.local
+.env.*.local
+
+# Jupyter
+.jupyter/
+*.ipynb_checkpoints/
+
+# Python package logs
+pip-debug.log*
+
+# Local development settings
+local_settings.py
+settings_local.py
+
+# Database files
+*.db
+*.sqlite
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
