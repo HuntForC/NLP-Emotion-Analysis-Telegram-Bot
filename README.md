@@ -43,7 +43,7 @@ A sophisticated Telegram bot powered by BERT (Bidirectional Encoder Representati
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/NLP-Emotion-Analysis-Telegram-Bot.git
+git clone https://github.com/HuntForC/NLP-Emotion-Analysis-Telegram-Bot.git
 cd NLP-Emotion-Analysis-Telegram-Bot
 ```
 
