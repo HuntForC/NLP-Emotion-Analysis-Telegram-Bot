@@ -47,14 +47,13 @@ git clone --no-checkout https://github.com/HuntForC/NLP-Emotion-Analysis-Telegra
 cd NLP-Emotion-Analysis-Telegram-Bot
 ```
 
-2. Download model file by git-lfs:
+2. Download model file by git-lfs or from [disk](https://disk.yandex.ru/d/JbCf3H2o0gfmNg) and put manually in model_training\emotion_bert:
 
 ```bash
 git lfs install
 git lfs pull
 ```
 
-or from [disk](https://disk.yandex.ru/d/JbCf3H2o0gfmNg)) and put manually in model_training\emotion_bert
 
 4. Create a virtual environment (recommended):
 
