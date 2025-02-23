@@ -49,7 +49,6 @@ cd NLP-Emotion-Analysis-Telegram-Bot
 
 2. Download model files from [disk](https://disk.yandex.ru/d/JbCf3H2o0gfmNg) and put manually in model_training\emotion_bert:
 
-
 3. Create a virtual environment (recommended):
 
 ```bash
