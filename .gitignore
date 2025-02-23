@@ -201,3 +201,116 @@ settings_local.py
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Additional Python ignores
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.py[cod]
+*$py.class
+
+# Coverage and testing
+.coverage
+coverage.xml
+.pytest_cache/
+.tox/
+.nox/
+htmlcov/
+
+# Virtual Environment
+.env
+.venv/
+venv/
+ENV/
+env/
+.env.local
+.env.*.local
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Poetry
+poetry.lock
+dist/
+poetry.toml
+
+# Ruff
+.ruff_cache/
+
+# PyCharm
+.idea/
+.idea_modules/
+*.iml
+*.iws
+.idea_modules/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs and Results
+logs/
+*.log
+results/
+output/
+/runs/
+tensorboard/
+wandb/
+mlruns/
+lightning_logs/
+*.out
+experiment_results/
+checkpoints/
+saved_models/
+model_outputs/
+
+# Model files
+*.pkl
+*.h5
+*.pth
+*.onnx
+*.pb
+*.tflite
+*.pt
+*.bin
+*.safetensors
+model_training/emotion_bert/
+*.model
+checkpoint/
+pretrained_models/
+weights/
