@@ -39,12 +39,42 @@ class Config:
     MODEL_DIR = Path("model_training")
     MODEL_PATH = MODEL_DIR / "emotion_bert"
     LABEL_ENCODER_PATH = MODEL_DIR / "label_encoder.pkl"
+    MODEL_STATE_DICT_PATH = (
+        MODEL_DIR / "pytorch_model.bin"
+    )  # Add path for PyTorch model
 
 
 def load_model_artifacts():
     """Load the trained model and label encoder"""
     try:
-        model = AutoModelForSequenceClassification.from_pretrained(Config.MODEL_PATH)
+        # First try loading with default method
+        try:
+            model = AutoModelForSequenceClassification.from_pretrained(
+                Config.MODEL_PATH,
+                local_files_only=True,
+                use_safetensors=False,  # Explicitly disable safetensors
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load model with default method: {e}")
+            # Fallback to loading base model and state dict separately
+            config_path = Config.MODEL_PATH / "config.json"
+            if not config_path.exists():
+                raise FileNotFoundError(f"Config file not found at {config_path}")
+
+            # Initialize model from base architecture
+            model = AutoModelForSequenceClassification.from_pretrained(
+                "distilbert-base-uncased",
+                config=config_path,
+                local_files_only=False,  # Allow downloading base model
+            )
+
+            # Load state dict if available
+            if Config.MODEL_STATE_DICT_PATH.exists():
+                state_dict = torch.load(Config.MODEL_STATE_DICT_PATH)
+                model.load_state_dict(state_dict)
+            else:
+                logger.warning("Model state dict not found, using base model")
+
         tokenizer = AutoTokenizer.from_pretrained(Config.MODEL_PATH)
         label_encoder = joblib.load(Config.LABEL_ENCODER_PATH)
         logger.info("Model and label encoder successfully loaded!")
@@ -84,10 +114,12 @@ async def analyze_text(update: Update, context: CallbackContext) -> None:
         with torch.no_grad():
             outputs = model(**inputs)
             probs = F.softmax(outputs.logits, dim=-1).squeeze().cpu().numpy()
-            predicted_label = np.argmax(probs)
+            # Get indices of top 2 predictions
+            top_2_indices = np.argsort(probs)[-2:][::-1]
 
-        emotion = label_encoder.inverse_transform([predicted_label])[0]
-        probability = probs[predicted_label] * 100
+        # Get emotions and probabilities for top 2 predictions
+        emotions = label_encoder.inverse_transform(top_2_indices)
+        probabilities = probs[top_2_indices] * 100
 
         emotion_emojis = {
             "joy": "😊",
@@ -97,10 +129,20 @@ async def analyze_text(update: Update, context: CallbackContext) -> None:
             "love": "❤️",
             "surprise": "😮",
         }
-        emoji = emotion_emojis.get(emotion.lower(), "🤔")
+
+        # Format response with top 2 emotions
+        main_emotion = emotions[0]
+        main_emoji = emotion_emojis.get(main_emotion.lower(), "🤔")
+        second_emotion = emotions[1]
+        second_emoji = emotion_emojis.get(second_emotion.lower(), "🤔")
+
+        response = (
+            f"I detect: *{main_emotion}* {main_emoji} ({probabilities[0]:.1f}%)\n"
+            f"But maybe: *{second_emotion}* {second_emoji} ({probabilities[1]:.1f}%)"
+        )
 
         await update.message.reply_text(  # type: ignore
-            f"I detect: *{emotion}* {emoji} ({probability:.2f}% confidence)",
+            response,
             parse_mode=constants.ParseMode.MARKDOWN,
         )
     except Exception as e:

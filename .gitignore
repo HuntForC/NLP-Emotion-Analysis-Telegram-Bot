@@ -298,19 +298,3 @@ experiment_results/
 checkpoints/
 saved_models/
 model_outputs/
-
-# Model files
-*.pkl
-*.h5
-*.pth
-*.onnx
-*.pb
-*.tflite
-*.pt
-*.bin
-*.safetensors
-model_training/emotion_bert/
-*.model
-checkpoint/
-pretrained_models/
-weights/

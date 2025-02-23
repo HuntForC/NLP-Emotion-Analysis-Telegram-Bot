@@ -191,7 +191,9 @@ def train_and_save_model():
     trainer.evaluate()
 
     # Save model and tokenizer
-    model.save_pretrained(MODEL_PATH)
+    model.save_pretrained(MODEL_PATH, safe_serialization=False)  # Disable safetensors
+    # Also save state dict separately for backup
+    torch.save(model.state_dict(), MODEL_PATH / "pytorch_model.bin")
     tokenizer.save_pretrained(MODEL_PATH)
     joblib.dump(label_encoder, LABEL_ENCODER_PATH)
     print("\nModel trained and saved successfully!")
