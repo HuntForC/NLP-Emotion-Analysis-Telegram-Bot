@@ -1,104 +1,202 @@
 import joblib
-import pandas as pd
+import torch
 from pathlib import Path
-from typing import Tuple
-from sklearn.model_selection import GridSearchCV
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import classification_report
-from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from data_preprocessing import load_data, preprocess_data
+import os
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+    Trainer,
+    TrainingArguments,
+    TrainerCallback,
+)
+import numpy as np
+from sklearn.metrics import accuracy_score, classification_report
+from data_preprocessing import prepare_datasets
 
 # File paths
-MODEL_PATH = Path("model_training/model.pkl")
-LABEL_ENCODER_PATH = Path("model_training/label_encoder.pkl")
-TRAIN_DATA_PATH = Path("data/train.txt")
-VAL_DATA_PATH = Path("data/val.txt")
+BASE_DIR = Path(__file__).parent.parent
+MODEL_PATH = BASE_DIR / "model_training/emotion_bert"
+LABEL_ENCODER_PATH = BASE_DIR / "model_training/label_encoder.pkl"
+TRAIN_DATA_PATH = BASE_DIR / "data/train.txt"
+VAL_DATA_PATH = BASE_DIR / "data/val.txt"
+LOGS_DIR = BASE_DIR / "logs"
+RESULTS_DIR = BASE_DIR / "results"
 
-# Model parameters
-TFIDF_PARAMS = {"sublinear_tf": True, "max_features": 10000, "ngram_range": (1, 2)}
-
-LOGISTIC_PARAMS = {
-    "solver": "lbfgs",
-    "C": 5.0,
-    "penalty": "l2",
-    "max_iter": 500,
-    "class_weight": "balanced",
-}
-
-GRID_SEARCH_PARAMS = {
-    "tfidf__ngram_range": [(1, 1), (1, 2)],
-    "tfidf__max_features": [5000, 10000],
-    "clf__C": [0.1, 1.0, 5.0],
-    "clf__max_iter": [500, 1000, 2000],
-    "clf__class_weight": ["balanced", None],
-}
+# Create directories if they don't exist
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def load_and_preprocess(file_path: Path) -> Tuple[pd.DataFrame, LabelEncoder]:
-    """Load and preprocess data"""
-    df = load_data(file_path)
-    return preprocess_data(df)
+class EmotionTrainingCallback(TrainerCallback):
+    """Custom callback to display training progress and metrics"""
+
+    def __init__(self, label_encoder):
+        self.label_encoder = label_encoder
+
+    def on_epoch_begin(self, args, state, control, **kwargs):
+        epoch = state.epoch if state.epoch is not None else 0
+        print(f"\nStarting epoch {int(epoch) + 1}/{args.num_train_epochs}")
+
+    def on_epoch_end(self, args, state, control, metrics=None, **kwargs):
+        """Display metrics at the end of each epoch"""
+        epoch = state.epoch if state.epoch is not None else 0
+        print(f"\nEpoch {int(epoch) + 1} completed")
+        if metrics:
+            # Display training metrics
+            train_loss = metrics.get("train_loss", 0)
+            print(f"Training loss: {train_loss:.4f}")
+
+            # Display evaluation metrics if available
+            eval_loss = metrics.get("eval_loss")
+            if eval_loss:
+                print(f"Validation loss: {eval_loss:.4f}")
 
 
-def evaluate_model(
-    model: Pipeline,
-    X_test: pd.DataFrame,
-    y_test: pd.Series,
-    label_encoder: LabelEncoder,
-):
-    """Evaluate model performance"""
-    y_pred = model.predict(X_test)
-    print("\nClassification Report:")
-    print(
-        classification_report(
-            y_test, y_pred, target_names=label_encoder.classes_, digits=3
+def compute_metrics(label_encoder):
+    """Create compute_metrics function with access to label_encoder"""
+
+    def compute_metrics_with_labels(eval_pred):
+        predictions, labels = eval_pred
+        predictions = np.argmax(predictions, axis=1)
+
+        # Calculate accuracy
+        accuracy = accuracy_score(labels, predictions)
+
+        # Get classification report
+        report = classification_report(
+            labels,
+            predictions,
+            target_names=label_encoder.classes_,
+            digits=4,
+            zero_division=0,
         )
-    )
 
+        print("\nClassification Report:")
+        print(report)
 
-def find_best_parameters(X_train: pd.DataFrame, y_train: pd.Series):
-    """Find optimal model parameters using grid search"""
-    pipeline = Pipeline(
-        [
-            ("tfidf", TfidfVectorizer(sublinear_tf=True)),
-            ("clf", LogisticRegression(solver="lbfgs", penalty="l2")),
-        ]
-    )
+        return {
+            "accuracy": accuracy,
+        }
 
-    searcher = GridSearchCV(
-        pipeline, GRID_SEARCH_PARAMS, cv=3, scoring="f1_weighted", n_jobs=-1, verbose=2
-    )
-
-    searcher.fit(X_train, y_train)
-
-    print(f"Best parameters: {searcher.best_params_}")
-    print(f"Best validation score: {searcher.best_score_:.3f}")
+    return compute_metrics_with_labels
 
 
 def train_and_save_model():
-    """Train model and save artifacts"""
-    train_df, label_encoder = load_and_preprocess(TRAIN_DATA_PATH)
-    val_df, _ = load_and_preprocess(VAL_DATA_PATH)
-
-    X_train, y_train = train_df["text"], train_df["emotion_encoded"]
-    X_val, y_val = val_df["text"], val_df["emotion_encoded"]
-
-    pipeline = Pipeline(
-        [
-            ("tfidf", TfidfVectorizer(**TFIDF_PARAMS)),
-            ("clf", LogisticRegression(**LOGISTIC_PARAMS)),
-        ]
+    """Train BERT model and save artifacts"""
+    # Prepare datasets
+    train_dataset, val_dataset, label_encoder = prepare_datasets(
+        TRAIN_DATA_PATH, VAL_DATA_PATH
     )
 
-    pipeline.fit(X_train, y_train)
+    # Initialize tokenizer and model
+    tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+    model = AutoModelForSequenceClassification.from_pretrained(
+        "distilbert-base-uncased", num_labels=len(label_encoder.classes_)
+    )
 
-    # evaluate_model(pipeline, X_val, y_val, label_encoder)
+    # Tokenization function
+    def tokenize_function(examples):
+        tokenized = tokenizer(
+            examples["text"],
+            padding="max_length",
+            truncation=True,
+            max_length=64,
+            return_tensors=None,
+        )
+        # Preserve the labels
+        tokenized["labels"] = examples["label"]
+        return tokenized
 
-    joblib.dump(pipeline, MODEL_PATH)
+    # Tokenize datasets
+    train_dataset = train_dataset.map(
+        tokenize_function,
+        batched=True,
+        remove_columns=[col for col in train_dataset.column_names if col != "label"],
+    )
+    val_dataset = val_dataset.map(
+        tokenize_function,
+        batched=True,
+        remove_columns=[col for col in val_dataset.column_names if col != "label"],
+    )
+
+    # Set format for pytorch
+    train_dataset.set_format("torch")
+    val_dataset.set_format("torch")
+
+    # Training arguments optimized for maximum speed
+    training_args = TrainingArguments(
+        output_dir=str(RESULTS_DIR),
+        num_train_epochs=2,  # Reduced from 3
+        # Larger batch size
+        per_device_train_batch_size=64,
+        per_device_eval_batch_size=128,
+        # Gradient accumulation
+        gradient_accumulation_steps=2,
+        # Faster learning rate
+        learning_rate=1e-4,
+        warmup_ratio=0.05,
+        # Reduced weight decay
+        weight_decay=0.001,
+        # Minimal logging
+        logging_dir=str(LOGS_DIR),
+        logging_steps=50,
+        # Evaluation and save strategies aligned to steps
+        evaluation_strategy="steps",
+        eval_steps=100,
+        save_strategy="steps",
+        save_steps=100,
+        # Mixed precision training
+        fp16=torch.cuda.is_available(),
+        half_precision_backend="auto",
+        # Load best model
+        load_best_model_at_end=True,
+        metric_for_best_model="accuracy",
+        # Report to tensorboard
+        report_to=["tensorboard"],
+        # Other optimizations
+        disable_tqdm=False,
+        dataloader_num_workers=4,  # Parallel data loading
+        group_by_length=True,  # Group similar length sequences
+    )
+
+    # Initialize trainer with callback and metrics
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=val_dataset,
+        compute_metrics=compute_metrics(label_encoder),
+        callbacks=[EmotionTrainingCallback(label_encoder)],
+    )
+
+    print("\nStarting model training with optimized settings...")
+    print(f"Training on {len(train_dataset)} examples")
+    print(f"Validating on {len(val_dataset)} examples")
+    print(f"Number of epochs: {training_args.num_train_epochs}")
+    print(f"Batch size: {training_args.per_device_train_batch_size}")
+    print(f"Gradient accumulation steps: {training_args.gradient_accumulation_steps}")
+    print(
+        f"Effective batch size: {training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps}"
+    )
+    print(
+        f"Mixed precision training: {'Enabled' if training_args.fp16 else 'Disabled'}"
+    )
+    print("=" * 50)
+
+    # Train the model
+    trainer.train()
+
+    # Final evaluation
+    print("\nFinal Evaluation:")
+    trainer.evaluate()
+
+    # Save model and tokenizer
+    model.save_pretrained(MODEL_PATH)
+    tokenizer.save_pretrained(MODEL_PATH)
     joblib.dump(label_encoder, LABEL_ENCODER_PATH)
-    print("Model trained and saved!")
+    print("\nModel trained and saved successfully!")
+    print(f"Model saved to: {MODEL_PATH}")
+    print(f"Label encoder saved to: {LABEL_ENCODER_PATH}")
 
 
 if __name__ == "__main__":
