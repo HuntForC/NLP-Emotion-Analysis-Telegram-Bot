@@ -43,19 +43,14 @@ A sophisticated Telegram bot powered by BERT (Bidirectional Encoder Representati
 1. Clone the repository:
 
 ```bash
-git clone --no-checkout https://github.com/HuntForC/NLP-Emotion-Analysis-Telegram-Bot.git
+git clone https://github.com/HuntForC/NLP-Emotion-Analysis-Telegram-Bot.git
 cd NLP-Emotion-Analysis-Telegram-Bot
 ```
 
-2. Download model file by git-lfs or from [disk](https://disk.yandex.ru/d/JbCf3H2o0gfmNg) and put manually in model_training\emotion_bert:
-
-```bash
-git lfs install
-git lfs pull
-```
+2. Download model files from [disk](https://disk.yandex.ru/d/JbCf3H2o0gfmNg) and put manually in model_training\emotion_bert:
 
 
-4. Create a virtual environment (recommended):
+3. Create a virtual environment (recommended):
 
 ```bash
 python -m venv venv
