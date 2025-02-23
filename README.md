@@ -74,7 +74,7 @@ TELEGRAM_BOT_TOKEN=your_bot_token_here
 1. Start the bot:
 
 ```bash
-python bot.py
+python telegram_bot\bot.py
 ```
 
 2. Open Telegram and search for your bot using its username
