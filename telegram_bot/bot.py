@@ -198,12 +198,63 @@ async def analyze_text(update: Update, context: CallbackContext) -> None:
         )
 
 
+async def start_command(update: Update, context: CallbackContext) -> None:
+    """Handle the /start command"""
+    if not update.message:
+        return
+
+    welcome_message = (
+        "👋 *Welcome to the Emotion Analysis Bot!*\n\n"
+        "I can analyze the emotions in your messages using advanced AI. "
+        "Simply send me any text message and I'll tell you what emotions I detect.\n\n"
+        "Available commands:\n"
+        "📝 Just type any message - I'll analyze its emotional content\n"
+        "ℹ️ /about - Learn more about how I work\n"
+        "❓ /help - Show this help message\n\n"
+        "Let's get started! Send me a message to analyze. 😊"
+    )
+    await update.message.reply_text(
+        welcome_message, parse_mode=constants.ParseMode.MARKDOWN
+    )
+
+
+async def about_command(update: Update, context: CallbackContext) -> None:
+    """Handle the /about command"""
+    if not update.message:
+        return
+
+    about_message = (
+        "🤖 *About Emotion Analysis Bot*\n\n"
+        "I'm powered by advanced Natural Language Processing and Machine Learning technology. "
+        "I use a fine-tuned BERT model to analyze emotions in text messages.\n\n"
+        "I can detect the following emotions:\n"
+        "• Joy 😊\n"
+        "• Sadness 😢\n"
+        "• Anger 😠\n"
+        "• Fear 😨\n"
+        "• Love ❤️\n"
+        "• Surprise 😮\n\n"
+        "Your feedback helps me improve! After each analysis, you can let me know if I got it right."
+    )
+    await update.message.reply_text(
+        about_message, parse_mode=constants.ParseMode.MARKDOWN
+    )
+
+
+async def help_command(update: Update, context: CallbackContext) -> None:
+    """Handle the /help command"""
+    await start_command(update, context)
+
+
 def main() -> None:
     """Initialize and start the bot"""
     try:
         application = ApplicationBuilder().token(TOKEN).build()  # type: ignore
 
         # Add handlers
+        application.add_handler(CommandHandler("start", start_command))
+        application.add_handler(CommandHandler("about", about_command))
+        application.add_handler(CommandHandler("help", help_command))
         application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_text)
         )
