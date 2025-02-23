@@ -298,3 +298,6 @@ experiment_results/
 checkpoints/
 saved_models/
 model_outputs/
+
+# Model files
+model_training/emotion_bert/
