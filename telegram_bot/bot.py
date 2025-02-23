@@ -4,16 +4,24 @@ import joblib
 import logging
 import torch
 import torch.nn.functional as F
-from typing import Optional
+from typing import Optional, cast
 from dotenv import load_dotenv
 from pathlib import Path
 from sklearn.preprocessing import LabelEncoder
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from telegram import Update, constants
+from telegram import (
+    Update,
+    constants,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    CallbackQuery,
+    Message,
+)
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters,
     CallbackContext,
 )
@@ -102,6 +110,36 @@ lemmatizer = WordNetLemmatizer()
 stop_words = set(stopwords.words("english"))
 
 
+async def handle_feedback(update: Update, context: CallbackContext) -> None:
+    """Handle user feedback on emotion prediction"""
+    if not update.callback_query:
+        return
+
+    query: CallbackQuery = update.callback_query
+    if not query.message or not query.from_user:
+        return
+
+    await query.answer()  # Acknowledge the button click
+
+    # Extract the feedback type from callback data
+    feedback = query.data or "unknown"
+    message = cast(Message, query.message)  # Cast to correct type
+    original_message = message.text or ""
+    user_name = query.from_user.first_name or "User"
+
+    if feedback == "correct":
+        response = f"Thanks {user_name}! 😊 Glad I got it right!"
+    else:
+        response = f"Thanks {user_name}! 😔 I'll try to do better next time."
+
+    # Edit the original message to remove the buttons
+    await query.edit_message_text(
+        text=f"{original_message}\n\n{response}",
+        parse_mode=constants.ParseMode.MARKDOWN,
+        reply_markup=None,
+    )
+
+
 async def analyze_text(update: Update, context: CallbackContext) -> None:
     """Analyze the emotional content of user messages with probabilities"""
     try:
@@ -141,9 +179,17 @@ async def analyze_text(update: Update, context: CallbackContext) -> None:
             f"But maybe: *{second_emotion}* {second_emoji} ({probabilities[1]:.1f}%)"
         )
 
+        # Create inline keyboard with thumbs up/down buttons
+        keyboard = [
+            [
+                InlineKeyboardButton("👍 Correct", callback_data="correct"),
+                InlineKeyboardButton("👎 Incorrect", callback_data="incorrect"),
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
         await update.message.reply_text(  # type: ignore
-            response,
-            parse_mode=constants.ParseMode.MARKDOWN,
+            response, parse_mode=constants.ParseMode.MARKDOWN, reply_markup=reply_markup
         )
     except Exception as e:
         logger.error(f"Error analyzing text: {e}")
@@ -156,9 +202,13 @@ def main() -> None:
     """Initialize and start the bot"""
     try:
         application = ApplicationBuilder().token(TOKEN).build()  # type: ignore
+
+        # Add handlers
         application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_text)
         )
+        application.add_handler(CallbackQueryHandler(handle_feedback))
+
         logger.info("Bot started successfully!")
         application.run_polling()
     except Exception as e:
